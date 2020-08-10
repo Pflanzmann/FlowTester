@@ -1,10 +1,15 @@
+import flowTester.org.example.flowTest.FlowScenarioApi
+import flowTester.org.example.flowTest.StepDoubleAssignmentException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runBlockingTest
 import org.flowTest.testCollect
 import org.flowTest.testScenario
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 internal class PlaygroundTest {
 
@@ -35,6 +40,26 @@ internal class PlaygroundTest {
                 assertDidThrow { IllegalStateException::class.java }
             }
         }
+    }
+
+    @Test
+    fun `testScenario, infix, `() = runBlockingTest {
+        val testFlow = getConstantFlow()
+
+        testFlow testScenario {
+            take = 12
+            confirmSteps = false
+            timeOut = FlowScenarioApi.MAX_TIMEOUT
+            allowThrowable = false
+
+            doAt(0) { assertNextElement { 0 } }
+            doAt(1) { assertNextElement { 1 } }
+            then { assertNextElement { 2 } }
+            then { dismissNextValue() }
+            then { assertNextElement { 4 } }
+        }
+
+
     }
 
     @Test
@@ -74,16 +99,18 @@ internal class PlaygroundTest {
     fun `testScenario, then without prestep`() = runBlockingTest {
         val testFlow = getConstantFlow()
 
-        testFlow.testScenario(4500L) {
+        testFlow.testScenario(take = 3, confirmSteps = false) {
+
             before { assertRemainingValuesCount { 0 } }
 
-            then { assertNextElement { 0 } }
-            then { assertNextElement { 1 } }
-            then { assertNextElement { 2 } }
-            then { assertNextElement { 3 } }
+            doAt(0) { assertNextElement { 0 } }
+            doAt(1) { assertNextElement { 1 } }
+            doAt(2) { assertNextElement { 2 } }
+            then { assertNextElement { -1 } }
+            then { assertNextElement { -1 } }
 
             after {
-                assertRemainingValuesCount { 1 }
+                assertRemainingValuesCount { 0 }
             }
         }
     }
@@ -107,6 +134,24 @@ internal class PlaygroundTest {
         }
     }
 
+    @Test
+    fun `testScenario, vararg, doubleAssignment`() = runBlockingTest {
+        val testFlow = getConstantFlow()
+
+        testFlow.testScenario {
+            timeOut = 6500L
+
+            before { assertRemainingValuesCount { 0 } }
+
+            Assertions.assertThrows(StepDoubleAssignmentException::class.java) {
+                doAt(0, 0) { dismissNextValue() }
+            }
+
+            after {
+                assertRemainingValuesCount { 6 }
+            }
+        }
+    }
 
     @Test
     fun `testCollect`() = runBlockingTest {
@@ -136,7 +181,7 @@ internal class PlaygroundTest {
     fun something4() = runBlockingTest {
         val testFlow = getConstantFlow()
 
-        testFlow.testCollect(4500L) {
+        testFlow.testCollect(take = 5) {
             assertNextElement { 0 }
             assertNextElement { 1 }
             assertNextElement { 2 }

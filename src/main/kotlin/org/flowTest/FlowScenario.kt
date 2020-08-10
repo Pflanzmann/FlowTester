@@ -2,6 +2,7 @@ package flowTester.org.example.flowTest
 
 import flowTester.org.example.flowTest.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
 import flowTester.org.example.flowTest.FlowScenarioApi.Companion.MAX_TIMEOUT
+import flowTester.org.example.flowTest.FlowScenarioApi.Companion.NO_LIMIT
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectIndexed
@@ -12,10 +13,13 @@ import org.junit.jupiter.api.fail
 import org.opentest4j.AssertionFailedError
 import java.util.*
 
+class StepDoubleAssignmentException : Throwable()
+
 interface FlowScenarioApi<T> {
     companion object {
         const val DEFAULT_TIMEOUT = 5000L
         const val MAX_TIMEOUT = Long.MAX_VALUE
+        const val NO_LIMIT = -1
     }
 
     var timeOut: Long
@@ -27,13 +31,19 @@ interface FlowScenarioApi<T> {
     fun after(step: suspend StepApi<T>.() -> Unit)
     fun before(step: suspend StepApi<T>.() -> Unit)
     fun then(step: suspend StepApi<T>.() -> Unit)
+    var take: Int
 }
 
 internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
+    private class FlowCancellationException : Throwable()
 
     override var timeOut: Long = DEFAULT_TIMEOUT
     override var confirmSteps: Boolean = true
     override var allowThrowable: Boolean = true
+    override var take: Int = NO_LIMIT
+        set(value) {
+            field = value - 1
+        }
 
     val steps = mutableMapOf<Int, StepApi<T>?>()
     var endStep: Step<T>? = null
@@ -60,6 +70,7 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
     }
 
     override fun doAt(position: Int, step: suspend StepApi<T>.() -> Unit) {
+        steps[position]?.let { throw StepDoubleAssignmentException() }
         steps[position] = Step(this, step)
         lastStepPosition = position
     }
@@ -72,7 +83,8 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
     }
 
     override fun then(step: suspend StepApi<T>.() -> Unit) {
-        doAt(++lastStepPosition, step)
+        lastStepPosition++
+        doAt(lastStepPosition, step)
     }
 
     suspend fun startScenario() {
@@ -85,12 +97,17 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
                         steps.remove(index)
                         it.invoke()
                     }
+
+                    if (index >= take)
+                        throw FlowCancellationException()
                 }
             } ?: run { finishedWithTimeout = true }
         } catch (e: TimeoutCancellationException) {
             steps[currentValue]?.invoke()
         } catch (e: AssertionFailedError) {
             throw e
+        } catch (e: FlowCancellationException) {
+
         } catch (e: Throwable) {
             thrownException?.let { throw e }
             thrownException = e
