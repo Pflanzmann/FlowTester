@@ -20,8 +20,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.3.8")
 }
 
-
-
 tasks {
     compileKotlin {
         kotlinOptions.jvmTarget = "1.8"
