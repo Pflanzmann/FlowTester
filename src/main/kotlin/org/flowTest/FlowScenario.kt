@@ -6,7 +6,7 @@ import flowTester.org.example.flowTest.FlowScenarioApi.Companion.NO_LIMIT
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectIndexed
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withTimeout
 import org.flowTest.Step
 import org.flowTest.StepApi
 import org.junit.jupiter.api.fail
@@ -89,7 +89,7 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
 
     suspend fun startScenario() {
         try {
-            withTimeoutOrNull(timeOut) {
+            withTimeout(timeOut) {
                 flow.collectIndexed { index, value ->
 
                     results.add(value)
@@ -98,16 +98,17 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
                         it.invoke()
                     }
 
-                    if (index >= take)
+                    if (take != NO_LIMIT && index >= take)
                         throw FlowCancellationException()
                 }
-            } ?: run { finishedWithTimeout = true }
+            }
         } catch (e: TimeoutCancellationException) {
+            println("timeouuut")
+            finishedWithTimeout = true
             steps[currentValue]?.invoke()
         } catch (e: AssertionFailedError) {
             throw e
         } catch (e: FlowCancellationException) {
-
         } catch (e: Throwable) {
             thrownException?.let { throw e }
             thrownException = e
@@ -118,7 +119,8 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
 
     private fun standardChecks() {
         if (steps.isNotEmpty() && confirmSteps)
-            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }.joinToString(separator = ",")}]\n")
+            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }
+                .joinToString(separator = ",")}]\n")
 
         if (allowThrowable)
             thrownException?.let { fail("Uncaught Throwable: ${it.javaClass}", it) }

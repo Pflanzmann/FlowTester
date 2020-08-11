@@ -16,7 +16,10 @@ interface StepApi<T> {
     fun <E : Throwable> assertDidThrow(type: () -> Class<E>)
 }
 
-internal class Step<T>(private val flowScenario: FlowScenario<T>, private val block: suspend Step<T>.() -> Unit) : StepApi<T> {
+internal class Step<T>(
+    private val flowScenario: FlowScenario<T>,
+    private val block: suspend Step<T>.() -> Unit
+) : StepApi<T> {
     override suspend operator fun invoke() = block()
 
     override infix fun assertNextElement(block: () -> T) {
@@ -26,12 +29,15 @@ internal class Step<T>(private val flowScenario: FlowScenario<T>, private val bl
         Assertions.assertEquals(blockResult, nextValue)
     }
 
-    override fun assertAllValuesConsumed(): Unit = Assertions.assertEquals(0, flowScenario.results.size)
+    override fun assertAllValuesConsumed(): Unit =
+        Assertions.assertEquals(0, flowScenario.results.size)
 
     override fun dismissNextValue() = flowScenario.nextValue
-    override fun assertRemainingValuesCount(block: () -> Int): Unit = Assertions.assertEquals(block(), flowScenario.results.size)
+    override fun assertRemainingValuesCount(block: () -> Int): Unit =
+        Assertions.assertEquals(block(), flowScenario.results.size)
 
-    override fun assertFinishWithTimeout() = if (!flowScenario.finishedWithTimeout) fail("Did not finish with a timeout") else Unit
+    override fun assertFinishWithTimeout() =
+        Assertions.assertTrue(flowScenario.finishedWithTimeout)
 
     override fun <E : Throwable> assertDidThrow(type: () -> Class<E>) {
         flowScenario.thrownException ?: fail("Nothing was thrown")
