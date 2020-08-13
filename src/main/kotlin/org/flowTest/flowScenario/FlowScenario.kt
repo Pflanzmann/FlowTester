@@ -123,7 +123,8 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
 
     private fun standardChecks() {
         if (steps.isNotEmpty() && confirmSteps)
-            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }.joinToString(separator = ",")}]\n")
+            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }
+                .joinToString(separator = ",")}]\n")
 
         if (allowThrowable)
             thrownException?.let { fail("Uncaught Throwable: ${it.javaClass}", it) }
