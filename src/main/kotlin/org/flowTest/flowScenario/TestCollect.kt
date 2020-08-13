@@ -1,4 +1,4 @@
-package org.flowTest
+package org.flowTest.flowScenario
 
 import flowTester.org.example.flowTest.FlowScenario
 import flowTester.org.example.flowTest.FlowScenarioApi

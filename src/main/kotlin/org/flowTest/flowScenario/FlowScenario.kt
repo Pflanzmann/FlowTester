@@ -7,8 +7,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.withTimeout
-import org.flowTest.Step
-import org.flowTest.StepApi
+import org.flowTest.flowScenario.Step
+import org.flowTest.flowScenario.StepApi
 import org.junit.jupiter.api.fail
 import org.opentest4j.AssertionFailedError
 import java.util.*
@@ -98,20 +98,24 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
                         it.invoke()
                     }
 
-                    if (take != NO_LIMIT && index >= take)
+                    if (take >= NO_LIMIT && index >= take)
                         throw FlowCancellationException()
                 }
             }
-        } catch (e: TimeoutCancellationException) {
-            println("timeouuut")
-            finishedWithTimeout = true
-            steps[currentValue]?.invoke()
-        } catch (e: AssertionFailedError) {
-            throw e
-        } catch (e: FlowCancellationException) {
         } catch (e: Throwable) {
-            thrownException?.let { throw e }
-            thrownException = e
+            when (e) {
+                is TimeoutCancellationException -> {
+                    finishedWithTimeout = true
+                    steps[currentValue]?.invoke()
+                }
+                is FlowCancellationException -> {
+                }
+                is AssertionFailedError -> throw e
+                else -> {
+                    thrownException?.let { throw e }
+                    thrownException = e
+                }
+            }
         }
 
         standardChecks()
@@ -119,8 +123,7 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
 
     private fun standardChecks() {
         if (steps.isNotEmpty() && confirmSteps)
-            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }
-                .joinToString(separator = ",")}]\n")
+            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }.joinToString(separator = ",")}]\n")
 
         if (allowThrowable)
             thrownException?.let { fail("Uncaught Throwable: ${it.javaClass}", it) }

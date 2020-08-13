@@ -1,30 +1,44 @@
 import flowTester.org.example.flowTest.FlowScenarioApi
 import flowTester.org.example.flowTest.StepDoubleAssignmentException
+import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runBlockingTest
-import org.flowTest.testCollect
-import org.flowTest.testScenario
+import org.flowTest.flowScenario.testCollect
+import org.flowTest.flowScenario.testScenario
+import org.flowTest.resumableFlow.ResumableFlow
+import org.flowTest.resumableFlow.nextValueOf
+import org.flowTest.resumableFlow.resumableFlowOf
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 
 internal class PlaygroundTest {
 
-    class FlowEndException() : Throwable()
+    class FlowEndException : Throwable()
 
-    private fun getConstantFlow(): Flow<Int> = flow {
+    private fun getConstantTimeFlow(): Flow<Int> = flow {
         var value = 0
+        emit(value++)
         while (value < 10) {
-            emit(value++)
             delay(1000)
+            emit(value++)
         }
         throw FlowEndException()
     }
 
+    private fun getListFlow(): Flow<Int> = flowOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+    private val broadcaster = ConflatedBroadcastChannel<Int>()
+
+    private fun getBroadcastFlow(): Flow<Int> = broadcaster.asFlow()
+
     @Test
     fun `testScenario, infix, assertDidThrow`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow testScenario {
             take = 4
@@ -35,14 +49,14 @@ internal class PlaygroundTest {
             doAt(1) { throw IllegalStateException("Some Exception") }
 
             after {
-                assertDidThrow { IllegalStateException::class.java }
+                assertDidThrow { IllegalStateException::class }
             }
         }
     }
 
     @Test
     fun `testScenario, not_Infix, assertDidThrow`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testScenario(take = 4) {
             before { assertRemainingValuesCount { 0 } }
@@ -51,14 +65,14 @@ internal class PlaygroundTest {
             doAt(1) { throw IllegalStateException("Some Exception") }
 
             after {
-                assertDidThrow { IllegalStateException::class.java }
+                assertDidThrow { IllegalStateException::class }
             }
         }
     }
 
     @Test
     fun `testScenario, then with prestep`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testScenario(take = 5) {
             before { assertRemainingValuesCount { 0 } }
@@ -75,7 +89,7 @@ internal class PlaygroundTest {
 
     @Test
     fun `testScenario, then without prestep`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testScenario(take = 3, confirmSteps = false) {
 
@@ -95,7 +109,7 @@ internal class PlaygroundTest {
 
     @Test
     fun `testScenario, vararg, then`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testScenario {
             take = 7
@@ -115,7 +129,7 @@ internal class PlaygroundTest {
 
     @Test
     fun `testScenario, vararg, doubleAssignment`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testScenario {
             take = 5
@@ -133,9 +147,9 @@ internal class PlaygroundTest {
 
     @Test
     fun `testCollect`() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
-        testFlow.testCollect(timeOut = 5500L) {
+        testFlow.testCollect(timeOut = 5000) {
             assertFinishWithTimeout()
             assertRemainingValuesCount { 5 }
         }
@@ -143,28 +157,99 @@ internal class PlaygroundTest {
 
     @Test
     fun something3() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testCollect(take = 5) {
-            assertNextElement { 0 }
-            assertNextElement { 1 }
+            assertNextElement(0)
+            assertNextElement(1)
             dismissNextValue()
-            assertNextElement { 3 }
-            assertNextElement { 4 }
+            assertNextElement(3)
+            assertNextElement(4)
             assertAllValuesConsumed()
         }
     }
 
     @Test
     fun something4() = runBlockingTest {
-        val testFlow = getConstantFlow()
+        val testFlow = getConstantTimeFlow()
 
         testFlow.testCollect(take = 5) {
-            assertNextElement { 0 }
+            assertNextElement(0)
             assertNextElement { 1 }
             assertNextElement { 2 }
             assertNextElement { 3 }
             assertRemainingValuesCount { 1 }
         }
+    }
+
+    @Test
+    fun resumableFlow1() = runBlocking {
+        val testFlow = getConstantTimeFlow()
+
+        val resumableFlow = ResumableFlow(testFlow)
+
+        println("before 0")
+        nextValueOf { resumableFlow } shouldBe { 0 }
+
+        println("before 1")
+        nextValueOf { resumableFlow } shouldBe { 1 }
+
+        println("before 2")
+        nextValueOf { resumableFlow } shouldBe { 2 }
+
+    }
+
+    @Test
+    fun resumableFlow2() = runBlocking {
+        val testFlow = getConstantTimeFlow()
+
+        val resumableFlow = resumableFlowOf { testFlow }
+
+        nextValueOf { resumableFlow } shouldBe 0
+
+        nextValueOf { resumableFlow } shouldBe 1
+
+        nextValueOf { resumableFlow } shouldBe 2
+    }
+
+    @Test
+    fun resumableFlow3() = runBlocking {
+        val testFlow = getConstantTimeFlow()
+
+        val resumableFlow = resumableFlowOf { testFlow }
+
+        nextValueOf { resumableFlow } then { println(it) }
+
+        nextValueOf { resumableFlow } shouldBe 1
+
+        nextValueOf { resumableFlow } shouldBe 2
+    }
+
+    @Test
+    fun resumableFlow4() = runBlocking {
+        val resumableFlow = resumableFlowOf { getConstantTimeFlow() }
+
+        var expectedValue = 0
+        while (expectedValue < 10) {
+            println(expectedValue)
+            nextValueOf { resumableFlow } shouldBe expectedValue++
+        }
+
+        nextValueOf { resumableFlow } didThrow FlowEndException::class
+
+    }
+
+    @Test
+    fun resumableFlow5() = runBlocking {
+        val resumableFlow = resumableFlowOf { getBroadcastFlow() }
+
+        broadcaster.send(0)
+        nextValueOf { resumableFlow } shouldBe 0
+
+        broadcaster.send(1)
+        nextValueOf { resumableFlow } shouldBe 1
+
+        broadcaster.send(2)
+        nextValueOf { resumableFlow } shouldBe 2
     }
 }

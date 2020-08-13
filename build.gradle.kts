@@ -17,7 +17,7 @@ dependencies {
     implementation("org.junit.jupiter:junit-jupiter-engine:5.6.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.8")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.3.8")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.3.8")
 }
 
 tasks {

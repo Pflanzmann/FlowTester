@@ -1,19 +1,22 @@
-package org.flowTest
+package org.flowTest.flowScenario
 
 import flowTester.org.example.flowTest.FlowScenario
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.fail
+import kotlin.reflect.KClass
 
 
 interface StepApi<T> {
 
     suspend operator fun invoke()
+    infix fun assertNextElement(value: T)
     infix fun assertNextElement(block: () -> T)
+
     fun dismissNextValue(): T?
     fun assertAllValuesConsumed()
     fun assertRemainingValuesCount(block: () -> Int)
     fun assertFinishWithTimeout()
-    fun <E : Throwable> assertDidThrow(type: () -> Class<E>)
+    fun <E : Throwable> assertDidThrow(type: () -> KClass<E>)
 }
 
 internal class Step<T>(
@@ -22,24 +25,33 @@ internal class Step<T>(
 ) : StepApi<T> {
     override suspend operator fun invoke() = block()
 
-    override infix fun assertNextElement(block: () -> T) {
-        val nextValue = flowScenario.nextValue ?: fail("No more values available")
-        val blockResult = block()
+    override infix fun assertNextElement(value: T): Unit {
+        val nextValue = flowScenario.nextValue ?: fail("No more values available.")
 
-        Assertions.assertEquals(blockResult, nextValue)
+        Assertions.assertEquals(value, nextValue)
     }
 
-    override fun assertAllValuesConsumed(): Unit =
-        Assertions.assertEquals(0, flowScenario.results.size)
+    override infix fun assertNextElement(block: () -> T) {
+        assertNextElement(block())
+    }
 
     override fun dismissNextValue() = flowScenario.nextValue
+
+    override fun assertAllValuesConsumed() {
+        if (flowScenario.results.isNotEmpty())
+            fail(
+                "Not all values got consumed\n" +
+                        "Remaining:\n ${flowScenario.results.mapIndexed { index, it -> "$index: ${it.toString()},\n" }}"
+            )
+    }
+
     override fun assertRemainingValuesCount(block: () -> Int): Unit =
         Assertions.assertEquals(block(), flowScenario.results.size)
 
     override fun assertFinishWithTimeout() =
         Assertions.assertTrue(flowScenario.finishedWithTimeout)
 
-    override fun <E : Throwable> assertDidThrow(type: () -> Class<E>) {
+    override fun <E : Throwable> assertDidThrow(type: () -> KClass<E>) {
         flowScenario.thrownException ?: fail("Nothing was thrown")
 
         if (!type().isInstance(flowScenario.thrownException))
