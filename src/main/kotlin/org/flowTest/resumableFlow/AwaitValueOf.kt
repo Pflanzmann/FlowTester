@@ -1,26 +1,32 @@
 package org.flowTest.resumableFlow
 
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
+import org.flowTest.exceptions.AwaitableFlowCanceledException
 import org.junit.jupiter.api.fail
 
 
-@Throws(TimeoutCancellationException::class)
-suspend fun <T> awaitValueOf(block: () -> AwaitableFlowApi<T>): AwaitedResultApi<T> {
-    val resumableFlow = (block() as? AwaitableFlowAccess<T>) ?: fail("internal error")
+suspend fun <T> awaitValueOf(flow: AwaitableFlow<T>): AwaitedResultApi<T> {
+    if (flow.state == AwaitableFlowApi.State.CANCELED)
+        return AwaitedResult(value = null, throwable = AwaitableFlowCanceledException())
 
-    withTimeout(resumableFlow.timeout) {
-        resumableFlow.valueJob.join()
+    withTimeout(flow.timeout) {
+        flow.valueJob.join()
     }
 
-    resumableFlow.valueJob = Job()
+    flow.valueJob = Job()
 
-    val value = resumableFlow.nextValue ?: fail("No next value available.")
+    flow.thrownException?.let {
+        return AwaitedResult(value = null, throwable = it)
+    }
 
-    resumableFlow.waitingJob.complete()
+    val value = flow.nextValue ?: fail("No next value available.")
+    flow.nextValue = null
+    flow.waitingJob.complete()
 
     return AwaitedResult(value)
 }
 
+suspend fun <T> awaitValueOf(block: () -> AwaitableFlow<T>): AwaitedResultApi<T> {
+    return awaitValueOf(block())
+}

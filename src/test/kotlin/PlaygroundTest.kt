@@ -1,6 +1,5 @@
 import flowTester.org.example.flowTest.FlowScenarioApi
 import flowTester.org.example.flowTest.StepDoubleAssignmentException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -9,11 +8,12 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runBlockingTest
+import org.flowTest.exceptions.AwaitableFlowCanceledException
 import org.flowTest.flowScenario.testCollect
 import org.flowTest.flowScenario.testScenario
+import org.flowTest.resumableFlow.AwaitableFlow
 import org.flowTest.resumableFlow.AwaitableFlowApi
 import org.flowTest.resumableFlow.awaitValueOf
-import org.flowTest.resumableFlow.awaitableFlow
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 
@@ -184,59 +184,60 @@ internal class PlaygroundTest {
     }
 
     @Test
-    fun resumableFlow1() = runBlocking {
+    fun awaitableFlow1() = runBlocking {
         val testFlow = getConstantTimeFlow()
 
-        val resumableFlow = awaitableFlow { testFlow }
+        val awaitableFlow = AwaitableFlow(testFlow)
 
-        awaitValueOf { resumableFlow } resultEquals { 0 }
+        awaitValueOf { awaitableFlow } resultEquals { 0 }
 
-        awaitValueOf { resumableFlow } resultEquals { 1 }
+        awaitValueOf { awaitableFlow } resultEquals { 1 }
 
-        awaitValueOf { resumableFlow } resultEquals { 2 }
+        awaitValueOf { awaitableFlow } resultEquals { 2 }
 
     }
 
     @Test
-    fun resumableFlow2() = runBlocking {
+    fun awaitableFlow2() = runBlocking {
         val testFlow = getConstantTimeFlow()
 
-        val resumableFlow = awaitableFlow { testFlow }
+        val awaitableFlow = AwaitableFlow(testFlow)
 
-        awaitValueOf { resumableFlow } resultEquals 0
+        awaitValueOf { awaitableFlow } resultEquals 0
 
-        awaitValueOf { resumableFlow } resultEquals 1
+        awaitValueOf { awaitableFlow } resultEquals 1
 
-        awaitValueOf { resumableFlow } resultEquals 2
+        awaitValueOf { awaitableFlow } resultEquals 2
     }
 
     @Test
-    fun resumableFlow3() = runBlocking {
+    fun awaitableFlow3() = runBlocking {
         val testFlow = getConstantTimeFlow()
 
-        val resumableFlow = awaitableFlow { testFlow }
+        val awaitableFlow = AwaitableFlow(testFlow)
 
-        awaitValueOf { resumableFlow } then { println(it) }
+        awaitValueOf { awaitableFlow } then { println(it) }
 
-        awaitValueOf { resumableFlow } resultEquals 1
+        awaitValueOf { awaitableFlow } resultEquals 1
 
-        awaitValueOf { resumableFlow } resultEquals 2
+        awaitValueOf { awaitableFlow } resultEquals 2
     }
 
     @Test
-    fun resumableFlow4() = runBlocking {
-        val resumableFlow = awaitableFlow { getConstantTimeFlow() }
+    fun awaitableFlow4() = runBlocking {
+        val awaitableFlow = AwaitableFlow(getConstantTimeFlow())
 
         var expectedValue = 0
-        while (expectedValue < 9) {
-            println(expectedValue)
-            awaitValueOf { resumableFlow } resultEquals expectedValue++
+        while (expectedValue < 10) {
+            awaitValueOf { awaitableFlow } resultEquals expectedValue++
         }
+
+        awaitValueOf { awaitableFlow } didThrow AwaitableFlowCanceledException::class
     }
 
     @Test
-    fun resumableFlow5() = runBlocking {
-        val awaitableFlow = awaitableFlow { getBroadcastFlow() }
+    fun awaitableFlow5() = runBlocking {
+        val awaitableFlow = AwaitableFlow(getBroadcastFlow())
 
         broadcaster.send(0)
         awaitValueOf { awaitableFlow } resultEquals 0
@@ -249,8 +250,8 @@ internal class PlaygroundTest {
     }
 
     @Test
-    fun resumableFlow6() = runBlocking {
-        val awaitableFlow = awaitableFlow { getBroadcastFlow() }.apply { timeout = 1000L }
+    fun awaitableFlow6() = runBlocking {
+        val awaitableFlow = AwaitableFlow(getBroadcastFlow()).apply { timeout = 1000L }
 
         broadcaster.send(0)
         awaitValueOf { awaitableFlow } resultEquals 0
@@ -258,18 +259,11 @@ internal class PlaygroundTest {
         broadcaster.send(1)
         awaitValueOf { awaitableFlow } resultEquals 1
 
-        Assertions.assertThrows(TimeoutCancellationException::class.java) {
-            runBlocking {
-                awaitValueOf { awaitableFlow } resultEquals 2
-            }
-        }
-
-        Unit
     }
 
     @Test
-    fun resumableFlow7() = runBlocking {
-        val awaitableFlow = awaitableFlow { getBroadcastFlow() }.apply { timeout = 1000L }
+    fun awaitableFlow7() = runBlocking {
+        val awaitableFlow = AwaitableFlow(getBroadcastFlow()).apply { timeout = 1000L }
 
         broadcaster.send(0)
         awaitValueOf { awaitableFlow } resultEquals 0
@@ -280,11 +274,7 @@ internal class PlaygroundTest {
         awaitableFlow.cancelFlow()
 
         broadcaster.send(2)
-        Assertions.assertThrows(TimeoutCancellationException::class.java) {
-            runBlocking {
-                awaitValueOf { awaitableFlow } resultEquals 2
-            }
-        }
+        awaitValueOf { awaitableFlow } didThrow AwaitableFlowCanceledException::class
 
         Assertions.assertEquals(AwaitableFlowApi.State.CANCELED, awaitableFlow.state)
     }

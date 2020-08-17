@@ -25,13 +25,13 @@ interface FlowScenarioApi<T> {
     var timeOut: Long
     var confirmSteps: Boolean
     var allowThrowable: Boolean
+    var take: Int
 
     fun doAt(position: Int, step: suspend StepApi<T>.() -> Unit)
     fun doAt(vararg positions: Int, step: suspend StepApi<T>.() -> Unit)
     fun after(step: suspend StepApi<T>.() -> Unit)
     fun before(step: suspend StepApi<T>.() -> Unit)
     fun then(step: suspend StepApi<T>.() -> Unit)
-    var take: Int
 }
 
 internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
@@ -123,8 +123,10 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
 
     private fun standardChecks() {
         if (steps.isNotEmpty() && confirmSteps)
-            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }
-                .joinToString(separator = ",")}]\n")
+            fail("Not all Steps got invoked \nRemaining positions: [${
+                steps.map { it.key.toString() }
+                        .joinToString(separator = ",")
+            }]\n")
 
         if (allowThrowable)
             thrownException?.let { fail("Uncaught Throwable: ${it.javaClass}", it) }

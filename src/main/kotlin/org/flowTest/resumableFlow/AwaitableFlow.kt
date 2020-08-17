@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 
 interface AwaitableFlowApi<T> {
-    enum class State { RUNNING, DONE, COMPLETED, CANCELED }
+    enum class State { RUNNING, COMPLETED, CANCELED }
 
     val state: State
     var timeout: Long
@@ -14,27 +14,18 @@ interface AwaitableFlowApi<T> {
     fun cancelFlow()
 }
 
-interface AwaitableFlowAccess<T> : AwaitableFlowApi<T> {
-    var valueJob: CompletableJob
-    var waitingJob: CompletableJob
-
-    var nextValue: T?
-    var thrownException: Throwable?
-}
-
-internal class AwaitableFlow<T>(
+class AwaitableFlow<T>(
     private val flow: Flow<T>
-) : AwaitableFlowApi<T>, AwaitableFlowAccess<T> {
-
-    override var valueJob = Job()
-    override var waitingJob = Job()
-
-    override var nextValue: T? = null
-    override var thrownException: Throwable? = null
-
+) : AwaitableFlowApi<T> {
     override var state = AwaitableFlowApi.State.RUNNING
     override var timeout: Long = 5000L
     override var dispatcher: CoroutineDispatcher = Dispatchers.Default
+
+    internal var valueJob = Job()
+    internal var waitingJob = Job()
+
+    internal  var nextValue: T? = null
+    internal  var thrownException: Throwable? = null
 
     private val collectJob = Job()
 
@@ -56,11 +47,12 @@ internal class AwaitableFlow<T>(
             } catch (e: Throwable) {
                 thrownException = e
                 state = AwaitableFlowApi.State.CANCELED
+                valueJob.complete()
                 return@launch
             }
 
             if (state != AwaitableFlowApi.State.CANCELED)
-                state = AwaitableFlowApi.State.DONE
+                state = AwaitableFlowApi.State.COMPLETED
         }
     }
 
@@ -70,12 +62,4 @@ internal class AwaitableFlow<T>(
             state = AwaitableFlowApi.State.CANCELED
         }
     }
-}
-
-fun <T> awaitableFlow(flow: Flow<T>): AwaitableFlowApi<T> {
-    return AwaitableFlow(flow)
-}
-
-fun <T> awaitableFlow(block: () -> Flow<T>): AwaitableFlowApi<T> {
-    return awaitableFlow(block())
 }
