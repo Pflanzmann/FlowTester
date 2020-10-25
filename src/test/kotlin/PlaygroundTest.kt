@@ -1,25 +1,19 @@
-import flowTester.org.example.flowTest.FlowScenarioApi
-import flowTester.org.example.flowTest.StepDoubleAssignmentException
+import flowtester.scenario.FlowScenario
+import flowtester.scenario.FlowScenarioApi
+import flowtester.scenario.testCollect
+import flowtester.scenario.testScenario
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.runBlockingTest
-import org.flowTest.exceptions.AwaitableFlowCanceledException
-import org.flowTest.flowScenario.testCollect
-import org.flowTest.flowScenario.testScenario
-import org.flowTest.resumableFlow.AwaitableFlow
-import org.flowTest.resumableFlow.AwaitableFlowApi
-import org.flowTest.resumableFlow.awaitValueOf
 import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.opentest4j.AssertionFailedError
 
 internal class PlaygroundTest {
 
-    class FlowEndException : Throwable()
+    class SomeRandomException : Throwable()
 
     private fun getConstantTimeFlow(): Flow<Int> = flow {
         var value = 0
@@ -28,7 +22,7 @@ internal class PlaygroundTest {
             delay(1000L)
             emit(value++)
         }
-        throw FlowEndException()
+        throw SomeRandomException()
     }
 
     private fun getListFlow(): Flow<Int> = flowOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
@@ -37,245 +31,182 @@ internal class PlaygroundTest {
 
     private fun getBroadcastFlow(): Flow<Int> = broadcaster.asFlow()
 
-    @Test
-    fun `testScenario, infix, assertDidThrow`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
+    private val stateFlow = MutableStateFlow<Int>(0)
 
-        testFlow testScenario {
-            take = 4
+    @Nested
+    inner class TestScenario_Working {
 
-            before { assertRemainingValuesCount { 0 } }
+        @Test
+        fun `testScenario 1`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
 
-            doAt(0) { assertNextElement { 0 } }
-            doAt(1) { throw IllegalStateException("Some Exception") }
+            testFlow testScenario {
+                take = 4
 
-            after {
-                assertDidThrow { IllegalStateException::class }
+                doAt(0) { nextValueEquals { 0 } }
+                doAt(1, canThrow = true) { throw IllegalStateException("Some Exception") }
+
+                afterAll { remainingValuesCount(3) }
+            }
+        }
+
+        @Test
+        fun `testScenario 2`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            testFlow.testScenario(take = 4) {
+
+                doAt(0) { nextValueEquals { 0 } }
+                doAt(1, canThrow = true) { throw IllegalStateException("Some Exception") }
+
+                afterAll { remainingValuesCount(3) }
+            }
+        }
+
+        @Test
+        fun `testScenario 3`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            testFlow.testScenario(take = 5) {
+
+                doAt(0) { nextValueEquals { 0 } }
+                then { nextValueEquals { 1 } }
+                then { nextValueEquals { 2 } }
+
+                afterAll { remainingValuesCount { 2 } }
+            }
+        }
+
+        @Test
+        fun `testScenario 4`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            testFlow.testScenario(take = 3, confirmSteps = false) {
+
+                doAt(0) { nextValueEquals { 0 } }
+                doAt(1) { nextValueEquals { 1 } }
+                doAt(2) { nextValueEquals { 2 } }
+                then { nextValueEquals { -1 } }
+                then { nextValueEquals { -1 } }
+
+                afterAll { remainingValuesCount { 0 } }
+            }
+        }
+
+        @Test
+        fun `testScenario 5`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            testFlow.testScenario {
+                take = 7
+                timeOut = FlowScenarioApi.MAX_TIMEOUT
+
+
+                doAt(0, 1, 2, 3) { dismissValue() }
+                then { nextValueEquals { 4 } }
+                then { nextValueEquals { 5 } }
+
+                afterAll { remainingValuesCount { 1 } }
+            }
+        }
+
+        @Test
+        fun `testScenario 6`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            testFlow.testScenario {
+                take = 5
+
+                Assertions.assertThrows(FlowScenario.StepDoubleAssignmentException::class.java) {
+                    doAt(0, 0, 0) { dismissValue() }
+                }
+
+                afterAll { remainingValuesCount { 4 } }
+            }
+        }
+
+        @Test
+        fun `testScenario 7`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            Assertions.assertThrows(AssertionFailedError::class.java) {
+                runBlockingTest {
+                    testFlow.testScenario {
+
+                        afterAll { consumedEnough() }
+                    }
+                }
+            }
+        }
+
+        @Test
+        fun `testScenario 8`() = runBlockingTest {
+            val testFlow = stateFlow
+
+            var currentPostion = 0
+
+            testFlow.testScenario {
+                take = 7
+
+                beforeAll { }
+
+                doAt(0, 1, 2, 3) {
+                    dismissValue()
+                    stateFlow.emit(++currentPostion)
+                }
+                then {
+                    nextValueEquals { 4 }
+                    stateFlow.emit(++currentPostion)
+                }
+                then {
+                    nextValueEquals { 5 }
+                    stateFlow.emit(++currentPostion)
+                    stateFlow.emit(++currentPostion)
+                }
+
+                afterAll {
+                    remainingValuesCount { 1 }
+                    consumedEnough()
+                }
             }
         }
     }
 
-    @Test
-    fun `testScenario, not_Infix, assertDidThrow`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
+    @Nested
+    inner class TestCollect {
 
-        testFlow.testScenario(take = 4) {
-            before { assertRemainingValuesCount { 0 } }
+        @Test
+        fun `testCollect 1`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
 
-            doAt(0) { assertNextElement { 0 } }
-            doAt(1) { throw IllegalStateException("Some Exception") }
+            testFlow.testCollect(timeOut = 5000) {
 
-            after {
-                assertDidThrow { IllegalStateException::class }
             }
         }
-    }
 
-    @Test
-    fun `testScenario, then with prestep`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
+        @Test
+        fun `testCollect 2`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
 
-        testFlow.testScenario(take = 5) {
-            before { assertRemainingValuesCount { 0 } }
-
-            doAt(0) { assertNextElement { 0 } }
-            then { assertNextElement { 1 } }
-            then { assertNextElement { 2 } }
-
-            after {
-                assertRemainingValuesCount { 2 }
+            testFlow.testCollect(take = 5) {
+                nextValueEquals(0)
+                nextValueEquals(1)
+                dismissValue()
+                nextValueEquals(3)
+                nextValueEquals(4)
             }
         }
-    }
 
-    @Test
-    fun `testScenario, then without prestep`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
+        @Test
+        fun `testCollect 3`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
 
-        testFlow.testScenario(take = 3, confirmSteps = false) {
-
-            before { assertRemainingValuesCount { 0 } }
-
-            doAt(0) { assertNextElement { 0 } }
-            doAt(1) { assertNextElement { 1 } }
-            doAt(2) { assertNextElement { 2 } }
-            then { assertNextElement { -1 } }
-            then { assertNextElement { -1 } }
-
-            after {
-                assertRemainingValuesCount { 0 }
+            testFlow.testCollect(take = 5) {
+                nextValueEquals(0)
+                nextValueEquals { 1 }
+                nextValueEquals { 2 }
+                nextValueEquals { 3 }
             }
         }
-    }
-
-    @Test
-    fun `testScenario, vararg, then`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
-
-        testFlow.testScenario {
-            take = 7
-            timeOut = FlowScenarioApi.MAX_TIMEOUT
-
-            before { assertRemainingValuesCount { 0 } }
-
-            doAt(0, 1, 2, 3) { dismissNextValue() }
-            then { assertNextElement { 4 } }
-            then { assertNextElement { 5 } }
-
-            after {
-                assertRemainingValuesCount { 1 }
-            }
-        }
-    }
-
-    @Test
-    fun `testScenario, vararg, doubleAssignment`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
-
-        testFlow.testScenario {
-            take = 5
-            before { assertRemainingValuesCount { 0 } }
-
-            Assertions.assertThrows(StepDoubleAssignmentException::class.java) {
-                doAt(0, 0, 0) { dismissNextValue() }
-            }
-
-            after {
-                assertRemainingValuesCount { 4 }
-            }
-        }
-    }
-
-    @Test
-    fun `testCollect`() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
-
-        testFlow.testCollect(timeOut = 5000) {
-            assertFinishWithTimeout()
-            assertRemainingValuesCount { 5 }
-        }
-    }
-
-    @Test
-    fun something3() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
-
-        testFlow.testCollect(take = 5) {
-            assertNextElement(0)
-            assertNextElement(1)
-            dismissNextValue()
-            assertNextElement(3)
-            assertNextElement(4)
-            assertAllValuesConsumed()
-        }
-    }
-
-    @Test
-    fun something4() = runBlockingTest {
-        val testFlow = getConstantTimeFlow()
-
-        testFlow.testCollect(take = 5) {
-            assertNextElement(0)
-            assertNextElement { 1 }
-            assertNextElement { 2 }
-            assertNextElement { 3 }
-            assertRemainingValuesCount { 1 }
-        }
-    }
-
-    @Test
-    fun awaitableFlow1() = runBlocking {
-        val testFlow = getConstantTimeFlow()
-
-        val awaitableFlow = AwaitableFlow(testFlow)
-
-        awaitValueOf { awaitableFlow } resultEquals { 0 }
-
-        awaitValueOf { awaitableFlow } resultEquals { 1 }
-
-        awaitValueOf { awaitableFlow } resultEquals { 2 }
-
-    }
-
-    @Test
-    fun awaitableFlow2() = runBlocking {
-        val testFlow = getConstantTimeFlow()
-
-        val awaitableFlow = AwaitableFlow(testFlow)
-
-        awaitValueOf { awaitableFlow } resultEquals 0
-
-        awaitValueOf { awaitableFlow } resultEquals 1
-
-        awaitValueOf { awaitableFlow } resultEquals 2
-    }
-
-    @Test
-    fun awaitableFlow3() = runBlocking {
-        val testFlow = getConstantTimeFlow()
-
-        val awaitableFlow = AwaitableFlow(testFlow)
-
-        awaitValueOf { awaitableFlow } then { println(it) }
-
-        awaitValueOf { awaitableFlow } resultEquals 1
-
-        awaitValueOf { awaitableFlow } resultEquals 2
-    }
-
-    @Test
-    fun awaitableFlow4() = runBlocking {
-        val awaitableFlow = AwaitableFlow(getConstantTimeFlow())
-
-        var expectedValue = 0
-        while (expectedValue < 10) {
-            awaitValueOf { awaitableFlow } resultEquals expectedValue++
-        }
-
-        awaitValueOf { awaitableFlow } didThrow AwaitableFlowCanceledException::class
-    }
-
-    @Test
-    fun awaitableFlow5() = runBlocking {
-        val awaitableFlow = AwaitableFlow(getBroadcastFlow())
-
-        broadcaster.send(0)
-        awaitValueOf { awaitableFlow } resultEquals 0
-
-        broadcaster.send(1)
-        awaitValueOf { awaitableFlow } resultEquals 1
-
-        broadcaster.send(2)
-        awaitValueOf { awaitableFlow } resultEquals 2
-    }
-
-    @Test
-    fun awaitableFlow6() = runBlocking {
-        val awaitableFlow = AwaitableFlow(getBroadcastFlow()).apply { timeout = 1000L }
-
-        broadcaster.send(0)
-        awaitValueOf { awaitableFlow } resultEquals 0
-
-        broadcaster.send(1)
-        awaitValueOf { awaitableFlow } resultEquals 1
-
-    }
-
-    @Test
-    fun awaitableFlow7() = runBlocking {
-        val awaitableFlow = AwaitableFlow(getBroadcastFlow()).apply { timeout = 1000L }
-
-        broadcaster.send(0)
-        awaitValueOf { awaitableFlow } resultEquals 0
-
-        broadcaster.send(1)
-        awaitValueOf { awaitableFlow } resultEquals 1
-
-        awaitableFlow.cancelFlow()
-
-        broadcaster.send(2)
-        awaitValueOf { awaitableFlow } didThrow AwaitableFlowCanceledException::class
-
-        Assertions.assertEquals(AwaitableFlowApi.State.CANCELED, awaitableFlow.state)
     }
 }
