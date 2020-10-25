@@ -23,9 +23,8 @@ fun flowTest() = runBlocking {
 
 ## Using in your projects
 
-The libraries are published to [kotlinx](https://bintray.com/kotlin/kotlinx/kotlinx.coroutines) bintray repository,
-linked to [JCenter](https://bintray.com/bintray/jcenter?filterByPkgName=kotlinx.coroutines) and 
-pushed to [Maven Central](https://search.maven.org/#search%7Cga%7C1%7Cg%3Aorg.jetbrains.kotlinx%20a%3Akotlinx-coroutines*).
+The libraries are published to [FlowTester](https://bintray.com/beta/#/pflanzmann/flow-tester/FlowTester) bintray repository,
+linked to [JCenter](https://bintray.com/bintray/jcenter?filterByPkgName=kotlinx.coroutines).
 
 ### Maven
 
