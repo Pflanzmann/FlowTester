@@ -1,8 +1,12 @@
-package flowtester.scenario
+package flowTester.scenario
 
-import flowtester.scenario.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
-import flowtester.scenario.FlowScenarioApi.Companion.MAX_TIMEOUT
-import flowtester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
+import flowTester.scenario.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
+import flowTester.scenario.FlowScenarioApi.Companion.MAX_TIMEOUT
+import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
+import flowTester.step.*
+import flowTester.step.EndStep
+import flowTester.step.StartStep
+import flowTester.step.Step
 import flowtester.step.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectIndexed

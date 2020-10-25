@@ -1,7 +1,7 @@
-import flowtester.scenario.FlowScenario
-import flowtester.scenario.FlowScenarioApi
-import flowtester.scenario.testCollect
-import flowtester.scenario.testScenario
+import flowTester.scenario.FlowScenario
+import flowTester.scenario.FlowScenarioApi
+import flowTester.scenario.testCollect
+import flowTester.scenario.testScenario
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*

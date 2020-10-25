@@ -1,6 +1,6 @@
-package flowtester.step
+package flowTester.step
 
-import flowtester.scenario.FlowScenario
+import flowTester.scenario.FlowScenario
 
 interface StartStepApi<T> {
     suspend operator fun invoke()

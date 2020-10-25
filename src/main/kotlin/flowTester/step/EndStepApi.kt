@@ -1,7 +1,7 @@
-package flowtester.step
+package flowTester.step
 
-import flowtester.scenario.FlowScenario
-import flowtester.scenario.FlowScenarioApi
+import flowTester.scenario.FlowScenario
+import flowTester.scenario.FlowScenarioApi
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.fail
 import kotlin.reflect.KClass

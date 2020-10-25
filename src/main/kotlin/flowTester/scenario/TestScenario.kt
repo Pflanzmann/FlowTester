@@ -1,7 +1,7 @@
-package flowtester.scenario
+package flowTester.scenario
 
-import flowtester.scenario.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
-import flowtester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
+import flowTester.scenario.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
+import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
 import kotlinx.coroutines.flow.Flow
 
 suspend fun <T> Flow<T>.testScenario(
