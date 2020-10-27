@@ -1,5 +1,8 @@
 package flowTester.scenario
 
+/**
+ * An interface
+ */
 internal interface FlowScenarioApiInternal<T> : FlowScenarioApi<T> {
 
     /**

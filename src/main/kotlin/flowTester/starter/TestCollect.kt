@@ -4,7 +4,6 @@ import flowTester.scenario.FlowScenario
 import flowTester.step.StepApi
 import kotlinx.coroutines.flow.Flow
 
-
 /**
  * Collects on a flow and invokes a method to test the results after the collection is done.
  * To not having an endless collection process you should set a timeout or a limit of taken objects.

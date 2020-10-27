@@ -1,5 +1,7 @@
 package flowTester.scenario
 
+import flowTester.exception.ScenarioCheckException
+import flowTester.exception.StepDoubleAssignmentException
 import flowTester.scenario.FlowScenarioApi.Companion.MAX_TIMEOUT
 import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
 import flowTester.step.Step
@@ -12,8 +14,6 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApiInternal<T> {
-    class StepDoubleAssignmentException : Throwable()
-    class ScenarioCheckException(message: String? = null, throwable: Throwable? = null) : Throwable(message, throwable)
 
     override var timeOut: Long = MAX_TIMEOUT
     override var take: Int = TAKE_WITHOUT_LIMIT
