@@ -2,9 +2,11 @@ import flowTester.scenario.FlowScenario
 import flowTester.scenario.FlowScenarioApi
 import flowTester.scenario.testCollect
 import flowTester.scenario.testScenario
-import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runBlockingTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Nested
@@ -14,21 +16,14 @@ internal class PlaygroundTest {
 
     class SomeRandomException : Throwable()
 
-    private fun getConstantTimeFlow(): Flow<Int> = flow {
+    private fun emitTo9AndThrowThenWithDelay(): Flow<Int> = flow {
         var value = 0
-        emit(value++)
         while (value < 10) {
-            delay(1000L)
             emit(value++)
+            delay(1000L)
         }
         throw SomeRandomException()
     }
-
-    private fun getListFlow(): Flow<Int> = flowOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-
-    private val broadcaster = ConflatedBroadcastChannel<Int>()
-
-    private fun getBroadcastFlow(): Flow<Int> = broadcaster.asFlow()
 
     private val stateFlow = MutableStateFlow<Int>(0)
 
@@ -36,35 +31,38 @@ internal class PlaygroundTest {
     inner class TestScenario_Working {
 
         @Test
-        fun `testScenario 1`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 01`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow testScenario {
-                take = 4
+                allowUncaughtThrowable = true
+                take = 15
 
                 doAt(0) { Assertions.assertEquals(0, pollValue) }
-                doAt(1, canThrow = true) { throw IllegalStateException("Some Exception") }
 
-                afterAll { Assertions.assertEquals(3, numberOfUnconsumedValues()) }
+                afterAll {
+                    Assertions.assertEquals(9, numberOfUnconsumedValues())
+                }
             }
         }
 
         @Test
-        fun `testScenario 2`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 02`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
-            testFlow.testScenario(take = 4) {
-
+            testFlow.testScenario(take = 15) {
                 doAt(0) { Assertions.assertEquals(0, pollValue) }
-                doAt(1, canThrow = true) { throw IllegalStateException("Some Exception") }
 
-                afterAll { Assertions.assertEquals(3, numberOfUnconsumedValues()) }
+                afterAll {
+                    didThrow(SomeRandomException())
+                    Assertions.assertEquals(9, numberOfUnconsumedValues())
+                }
             }
         }
 
         @Test
-        fun `testScenario 3`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 03`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testScenario(take = 5) {
 
@@ -77,10 +75,10 @@ internal class PlaygroundTest {
         }
 
         @Test
-        fun `testScenario 4`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 04`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
-            testFlow.testScenario(take = 3, confirmSteps = false) {
+            testFlow.testScenario(take = 3, verifyAllSteps = false) {
 
                 doAt(0) { Assertions.assertEquals(0, pollValue) }
                 doAt(1) { Assertions.assertEquals(1, pollValue) }
@@ -94,12 +92,11 @@ internal class PlaygroundTest {
         }
 
         @Test
-        fun `testScenario 5`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 05`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testScenario {
                 take = 7
-                timeOut = FlowScenarioApi.MAX_TIMEOUT
 
                 doAt(0, 1, 2, 3) { dismissValue() }
                 doAt(4) { Assertions.assertEquals(4, pollValue) }
@@ -111,8 +108,8 @@ internal class PlaygroundTest {
         }
 
         @Test
-        fun `testScenario 6`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 06`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testScenario {
                 take = 5
@@ -126,24 +123,25 @@ internal class PlaygroundTest {
         }
 
         @Test
-        fun `testScenario 7`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+        fun `testScenario 07`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testScenario {
+                allowUncaughtThrowable = true
 
                 afterAll { Assertions.assertFalse(consumedAllSteps()) }
             }
         }
 
         @Test
-        fun `testScenario 8`() = runBlockingTest {
+        fun `testScenario 08`() = runBlockingTest {
             val testFlow = stateFlow
 
             var currentPostion = 0
 
             testFlow.testScenario {
                 take = 7
-                forceConsumeAllSteps = false
+                verifyAllSteps = false
 
                 beforeAll { }
 
@@ -168,7 +166,7 @@ internal class PlaygroundTest {
         }
 
         @Test
-        fun `testScenario 9`() = runBlockingTest {
+        fun `testScenario 09`() = runBlockingTest {
             val testFlow = flowOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
             testFlow testScenario {
@@ -185,13 +183,45 @@ internal class PlaygroundTest {
 
         @Test
         fun `testScenario 10`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testScenario {
-                forceConsumeAllSteps = false
                 timeOut = 500L
 
                 doAt(0, 1, 2, 3) { dismissValue() }
+
+                afterAll { Assertions.assertTrue(finishWithTimeout()) }
+            }
+        }
+
+        @Test
+        fun `testScenario 11`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
+
+            var incrementalExpectedInt = 0
+
+            testFlow.testScenario {
+                timeOut = 5000L
+
+                doAt(0, 1, 2, 3) { Assertions.assertEquals(incrementalExpectedInt++, popValue) }
+
+                afterAll {
+                    Assertions.assertTrue(finishWithTimeout())
+                    Assertions.assertEquals(1, numberOfUnconsumedValues())
+                }
+            }
+        }
+
+        @Test
+        fun `testScenario 12`() = runBlockingTest {
+            val testFlow = emitTo9AndThrowThenWithDelay()
+
+            var incrementalExpectedInt = 0
+
+            testFlow.testScenario {
+                timeOut = 5000L
+
+                doAt(0, 1, 2, 3) { Assertions.assertEquals(incrementalExpectedInt++, pollValue) }
 
                 afterAll { Assertions.assertTrue(finishWithTimeout()) }
             }
@@ -203,7 +233,7 @@ internal class PlaygroundTest {
 
         @Test
         fun `testCollect 1`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testCollect(timeOut = 5000) {
 
@@ -212,7 +242,7 @@ internal class PlaygroundTest {
 
         @Test
         fun `testCollect 2`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testCollect(take = 5) {
                 Assertions.assertEquals(0, pollValue)
@@ -225,7 +255,7 @@ internal class PlaygroundTest {
 
         @Test
         fun `testCollect 3`() = runBlockingTest {
-            val testFlow = getConstantTimeFlow()
+            val testFlow = emitTo9AndThrowThenWithDelay()
 
             testFlow.testCollect(take = 5) {
                 Assertions.assertEquals(0, pollValue)

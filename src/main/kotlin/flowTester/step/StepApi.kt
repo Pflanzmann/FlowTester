@@ -2,14 +2,12 @@ package flowTester.step
 
 import flowTester.scenario.FlowScenario
 import flowTester.scenario.FlowScenarioApi
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.fail
 import kotlin.reflect.KClass
 
 
 interface StepApi<T> {
     val pollValue: T
-    val stepValue: T
+    val popValue: T
 
     suspend operator fun invoke()
 
@@ -26,21 +24,19 @@ interface StepApi<T> {
 
 internal open class Step<T>(
     private val flowScenario: FlowScenario<T>,
-    private val block: suspend Step<T>.() -> Unit,
-
-    val shouldThrow: Boolean
+    private val block: suspend Step<T>.() -> Unit
 ) : StepApi<T> {
     override val pollValue: T
         get() = flowScenario.pollValue
 
-    override val stepValue: T
-        get() = flowScenario.latestValue
+    override val popValue: T
+        get() = flowScenario.popValue
 
     override suspend operator fun invoke() = block()
 
-    override fun allValuesConsumed(): Boolean = flowScenario.results.isNotEmpty()
+    override fun allValuesConsumed(): Boolean = flowScenario.valueCount == 0
 
-    override fun numberOfUnconsumedValues(): Int = flowScenario.results.size
+    override fun numberOfUnconsumedValues(): Int = flowScenario.valueCount
 
     override fun finishWithTimeout(): Boolean = flowScenario.finishedWithTimeout
 

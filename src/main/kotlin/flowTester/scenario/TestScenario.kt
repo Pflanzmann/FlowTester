@@ -1,21 +1,17 @@
 package flowTester.scenario
 
-import flowTester.scenario.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
-import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
 import kotlinx.coroutines.flow.Flow
 
 suspend fun <T> Flow<T>.testScenario(
-    timeOut: Long = DEFAULT_TIMEOUT,
-    confirmSteps: Boolean = true,
-    allowThrowable: Boolean = false,
-    take: Int = TAKE_WITHOUT_LIMIT,
+    timeOut: Long? = null,
+    verifyAllSteps: Boolean? = null,
+    take: Int? = null,
     setupScenario: suspend FlowScenarioApi<T>.() -> Unit
 ) {
     val flowTest = FlowScenario<T>(this).apply {
-        this.timeOut = timeOut
-        this.forceConsumeAllSteps = confirmSteps
-        this.allowUncaughtThrowable = allowThrowable
-        this.take = take
+        timeOut?.let { this.timeOut = timeOut }
+        verifyAllSteps?.let { this.verifyAllSteps = verifyAllSteps }
+        take?.let { this.take = take }
     }
 
     flowTest.setupScenario()

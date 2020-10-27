@@ -103,12 +103,11 @@ bintray {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.10")
-
-//    implementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
-    implementation("org.junit.jupiter:junit-jupiter-engine:5.6.0")
-
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.0-M1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.4.0-M1")
+
+
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.6.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.4.0-M1")
 }
 
 tasks {
