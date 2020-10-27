@@ -4,13 +4,14 @@ import flowTester.scenario.FlowScenarioApi.Companion.MAX_TIMEOUT
 import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
 import flowTester.step.Step
 import flowTester.step.StepApi
+import flowTester.step.StepApiInternal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.withTimeoutOrNull
 
-internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
+internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApiInternal<T> {
     class StepDoubleAssignmentException : Throwable()
     class ScenarioCheckException(message: String? = null, throwable: Throwable? = null) : Throwable(message, throwable)
 
@@ -20,26 +21,32 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
     override var verifyAllValues: Boolean = false
     override var allowUncaughtThrowable: Boolean = false
 
-    private val steps = mutableMapOf<Int, Step<T>?>()
-    private var endStep: Step<T>? = null
-    private var startStep: Step<T>? = null
+    private val steps = mutableMapOf<Int, StepApiInternal<T>?>()
+    private var endStep: StepApiInternal<T>? = null
+    private var startStep: StepApiInternal<T>? = null
 
     private val results = ArrayDeque<T>()
 
-    val valueCount: Int
+    private var latestThrowable: Throwable? = null
+    private var lastStepPosition = -1
+
+    override val valueCount: Int
         get() = results.size
 
-    val pollValue: T
+    override val pollValue: T
         get() = results.removeFirst()
 
-    val popValue: T
+    override val popValue: T
         get() = results.removeLast()
 
-    var finishedWithTimeout = false
-    var latestThrowable: Throwable? = null
-    var numberOfConsumes = 0
+    override var finishedWithTimeout = false
+    override var numberOfConsumedSteps = 0
 
-    private var lastStepPosition = -1
+    override fun consumeThrowable(): Throwable? {
+        val throwable = latestThrowable
+        latestThrowable = null
+        return throwable
+    }
 
     override fun beforeAll(step: suspend StepApi<T>.() -> Unit) {
         this.startStep = Step(this, step)
@@ -74,7 +81,7 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
             flow.catch { throwable ->
                 latestThrowable = throwable
             }.take(take).collectIndexed { index, value ->
-                numberOfConsumes++
+                numberOfConsumedSteps++
 
                 results.add(value)
                 steps[index]?.let {

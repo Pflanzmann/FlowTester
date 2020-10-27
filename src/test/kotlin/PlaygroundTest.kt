@@ -1,6 +1,6 @@
 import flowTester.scenario.FlowScenario
-import flowTester.scenario.testCollect
-import flowTester.scenario.testScenario
+import flowTester.starter.testCollect
+import flowTester.starter.testScenario
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
