@@ -1,3 +1,4 @@
+import flowTester.exception.StepDoubleAssignmentException
 import flowTester.scenario.FlowScenario
 import flowTester.starter.testCollect
 import flowTester.starter.testScenario
@@ -113,7 +114,7 @@ internal class PlaygroundTest {
             testFlow.testScenario {
                 take = 5
 
-                Assertions.assertThrows(FlowScenario.StepDoubleAssignmentException::class.java) {
+                Assertions.assertThrows(StepDoubleAssignmentException::class.java) {
                     doAt(0, 0, 0) { dismissValue() }
                 }
 
