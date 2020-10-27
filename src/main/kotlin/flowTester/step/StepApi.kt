@@ -1,70 +1,70 @@
 package flowTester.step
 
 import flowTester.scenario.FlowScenario
+import flowTester.scenario.FlowScenarioApi
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.fail
 import kotlin.reflect.KClass
 
 
 interface StepApi<T> {
+    val pollValue: T
+    val stepValue: T
+
     suspend operator fun invoke()
 
-    infix fun nextValueEquals(expected: T)
-    infix fun nextValueEquals(expected: () -> T)
     fun dismissValue(number: Int = 1)
 
-    fun allValuesConsumed()
-    fun remainingValuesCount(expected: Int)
-    fun remainingValuesCount(expected: () -> Int)
-    fun finishWithTimeout()
-    fun <E : Throwable> didThrow(type: () -> KClass<E>)
-    fun <E : Throwable> didThrow(type: KClass<E>)
+    fun allValuesConsumed(): Boolean
+    fun numberOfUnconsumedValues(): Int
+    fun finishWithTimeout(): Boolean
+    fun consumedAllSteps(): Boolean
+    fun <E : Throwable> didThrow(type: KClass<E>): Boolean
+    fun <E : Throwable> didThrow(type: () -> KClass<E>): Boolean
+    fun didThrow(expectedThrowable: Throwable): Boolean
 }
 
-internal class Step<T>(
+internal open class Step<T>(
     private val flowScenario: FlowScenario<T>,
     private val block: suspend Step<T>.() -> Unit,
 
-    val canThrow: Boolean
+    val shouldThrow: Boolean
 ) : StepApi<T> {
+    override val pollValue: T
+        get() = flowScenario.pollValue
+
+    override val stepValue: T
+        get() = flowScenario.latestValue
 
     override suspend operator fun invoke() = block()
 
-    override fun allValuesConsumed() {
-        if (flowScenario.results.isNotEmpty())
-            fail("Not all values got consumed\n" + "Remaining:\n ${flowScenario.results.mapIndexed { index, it -> "$index: ${it.toString()},\n" }}")
-    }
+    override fun allValuesConsumed(): Boolean = flowScenario.results.isNotEmpty()
 
-    override fun remainingValuesCount(expected: Int) {
-        Assertions.assertEquals(expected, flowScenario.results.size)
-    }
+    override fun numberOfUnconsumedValues(): Int = flowScenario.results.size
 
-    override fun remainingValuesCount(expected: () -> Int) = remainingValuesCount(expected())
-
-    override fun finishWithTimeout() {
-        if (!flowScenario.finishedWithTimeout)
-            fail("Did not finish with timeout as expected.")
-    }
-
-    override fun nextValueEquals(expected: T) {
-        val nextValue = flowScenario.nextValue ?: fail("No more values available.")
-
-        Assertions.assertEquals(expected, nextValue)
-    }
-
-    override infix fun nextValueEquals(expected: () -> T) = nextValueEquals(expected())
+    override fun finishWithTimeout(): Boolean = flowScenario.finishedWithTimeout
 
     override fun dismissValue(number: Int) = repeat(number) {
-        flowScenario.nextValue
+        flowScenario.pollValue
     }
 
-    override fun <E : Throwable> didThrow(type: KClass<E>) {
-        val throwable = flowScenario.latestThrowable ?: fail("Nothing was thrown")
+    override fun consumedAllSteps(): Boolean {
+        return (flowScenario.take != FlowScenarioApi.TAKE_WITHOUT_LIMIT && flowScenario.take != flowScenario.numberOfConsumes)
+    }
+
+    override fun <E : Throwable> didThrow(type: KClass<E>): Boolean {
+        val throwable = flowScenario.latestThrowable
         flowScenario.latestThrowable = null
 
-        if (!type.isInstance(throwable))
-            fail("Wrong Throwable type: $throwable")
+        return !type.isInstance(throwable)
     }
 
-    override fun <E : Throwable> didThrow(type: () -> KClass<E>) = didThrow(type())
+    override fun <E : Throwable> didThrow(type: () -> KClass<E>): Boolean = didThrow(type())
+
+    override fun didThrow(expectedThrowable: Throwable): Boolean {
+        val throwable = flowScenario.latestThrowable
+        flowScenario.latestThrowable = null
+
+        return throwable == flowScenario.latestThrowable
+    }
 }

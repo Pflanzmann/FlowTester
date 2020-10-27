@@ -4,10 +4,7 @@ import flowTester.scenario.FlowScenarioApi.Companion.DEFAULT_TIMEOUT
 import flowTester.scenario.FlowScenarioApi.Companion.MAX_TIMEOUT
 import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
 import flowTester.step.*
-import flowTester.step.EndStep
-import flowTester.step.StartStep
 import flowTester.step.Step
-import flowtester.step.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.take
@@ -23,36 +20,39 @@ interface FlowScenarioApi<T> {
     }
 
     var timeOut: Long
-    var confirmUnconsumedSteps: Boolean
+    var forceConsumeAllSteps: Boolean
     var allowUncaughtThrowable: Boolean
     var take: Int
     var canThrowDefault: Boolean
+    var forceConsumeAllValues: Boolean
 
     fun doAt(position: Int, canThrow: Boolean = canThrowDefault, step: suspend StepApi<T>.() -> Unit)
     fun doAt(vararg positions: Int, canThrow: Boolean = canThrowDefault, step: suspend StepApi<T>.() -> Unit)
-    fun beforeAll(canThrow: Boolean = canThrowDefault, step: suspend StartStepApi<T>.() -> Unit)
-    fun afterAll(canThrow: Boolean = canThrowDefault, step: suspend EndStepApi<T>.() -> Unit)
+    fun beforeAll(canThrow: Boolean = canThrowDefault, step: suspend StepApi<T>.() -> Unit)
+    fun afterAll(canThrow: Boolean = canThrowDefault, step: suspend StepApi<T>.() -> Unit)
     fun then(canThrow: Boolean = canThrowDefault, step: suspend StepApi<T>.() -> Unit)
 }
 
 internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
     class StepInvocationException(override val cause: Throwable? = null) : Throwable(cause)
-    object FlowCancellationException : Exception()
     class StepDoubleAssignmentException : Throwable()
 
     override var timeOut: Long = DEFAULT_TIMEOUT
     override var take: Int = TAKE_WITHOUT_LIMIT
-    override var confirmUnconsumedSteps: Boolean = true
+    override var forceConsumeAllSteps: Boolean = true
+    override var forceConsumeAllValues: Boolean = false
     override var allowUncaughtThrowable: Boolean = false
     override var canThrowDefault: Boolean = false
 
     private val steps = mutableMapOf<Int, Step<T>?>()
-    var endStep: EndStep<T>? = null
-    var startStep: StartStep<T>? = null
+    var endStep: Step<T>? = null
+    var startStep: Step<T>? = null
 
     val results = ArrayDeque<T>()
-    val nextValue: T?
+    val pollValue: T
         get() = results.removeFirst()
+    val latestValue: T
+        get() = results.last()
 
     var finishedWithTimeout = false
     var latestThrowable: Throwable? = null
@@ -60,12 +60,12 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
 
     private var lastStepPosition = -1
 
-    override fun beforeAll(canThrow: Boolean, step: suspend StartStepApi<T>.() -> Unit) {
-        this.startStep = StartStep(this, step)
+    override fun beforeAll(canThrow: Boolean, step: suspend StepApi<T>.() -> Unit) {
+        this.startStep = Step(this, step, canThrow)
     }
 
-    override fun afterAll(canThrow: Boolean, step: suspend EndStepApi<T>.() -> Unit) {
-        this.endStep = EndStep(this, step)
+    override fun afterAll(canThrow: Boolean, step: suspend StepApi<T>.() -> Unit) {
+        this.endStep = Step(this, step, canThrow)
     }
 
     override fun doAt(position: Int, canThrow: Boolean, step: suspend StepApi<T>.() -> Unit) {
@@ -102,7 +102,7 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
                         } catch (e: AssertionError) {
                             throw e
                         } catch (e: Throwable) {
-                            if (!it.canThrow)
+                            if (!it.shouldThrow)
                                 throw StepInvocationException(e)
                         }
                     }
@@ -122,8 +122,11 @@ internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
     }
 
     private fun standardChecks() {
-        if (confirmUnconsumedSteps && steps.isNotEmpty())
-            fail("Not all Steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }.joinToString(separator = ",")}]\n")
+        if (forceConsumeAllSteps && steps.isNotEmpty())
+            fail("Not all steps got invoked \nRemaining positions: [${steps.map { it.key.toString() }.joinToString(separator = ",")}]\n")
+
+        if (forceConsumeAllValues && results.isNotEmpty())
+            fail("Not all values got consumed \nRemaining values: ${results.map { it.toString() + "\n"  }}\n")
 
         if (!allowUncaughtThrowable)
             latestThrowable?.let { fail("Uncaught Throwable: ", latestThrowable) }

@@ -13,7 +13,7 @@ suspend fun <T> Flow<T>.testScenario(
 ) {
     val flowTest = FlowScenario<T>(this).apply {
         this.timeOut = timeOut
-        this.confirmUnconsumedSteps = confirmSteps
+        this.forceConsumeAllSteps = confirmSteps
         this.allowUncaughtThrowable = allowThrowable
         this.take = take
     }

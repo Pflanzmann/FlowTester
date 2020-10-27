@@ -18,7 +18,7 @@ interface EndStepApi<T> {
     fun <E : Throwable> didThrow(type: KClass<E>)
 }
 
-internal open class EndStep<T>(
+internal class EndStep<T>(
     private val flowScenario: FlowScenario<T>,
     private val block: suspend EndStep<T>.() -> Unit
 ) : EndStepApi<T> {

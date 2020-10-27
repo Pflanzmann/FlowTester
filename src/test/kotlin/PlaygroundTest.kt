@@ -9,7 +9,6 @@ import kotlinx.coroutines.test.runBlockingTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.opentest4j.AssertionFailedError
 
 internal class PlaygroundTest {
 
@@ -43,10 +42,10 @@ internal class PlaygroundTest {
             testFlow testScenario {
                 take = 4
 
-                doAt(0) { nextValueEquals { 0 } }
+                doAt(0) { Assertions.assertEquals(0, pollValue) }
                 doAt(1, canThrow = true) { throw IllegalStateException("Some Exception") }
 
-                afterAll { remainingValuesCount(3) }
+                afterAll { Assertions.assertEquals(3, numberOfUnconsumedValues()) }
             }
         }
 
@@ -56,10 +55,10 @@ internal class PlaygroundTest {
 
             testFlow.testScenario(take = 4) {
 
-                doAt(0) { nextValueEquals { 0 } }
+                doAt(0) { Assertions.assertEquals(0, pollValue) }
                 doAt(1, canThrow = true) { throw IllegalStateException("Some Exception") }
 
-                afterAll { remainingValuesCount(3) }
+                afterAll { Assertions.assertEquals(3, numberOfUnconsumedValues()) }
             }
         }
 
@@ -69,11 +68,11 @@ internal class PlaygroundTest {
 
             testFlow.testScenario(take = 5) {
 
-                doAt(0) { nextValueEquals { 0 } }
-                then { nextValueEquals { 1 } }
-                then { nextValueEquals { 2 } }
+                doAt(0) { Assertions.assertEquals(0, pollValue) }
+                then { Assertions.assertEquals(1, pollValue) }
+                then { Assertions.assertEquals(2, pollValue) }
 
-                afterAll { remainingValuesCount { 2 } }
+                afterAll { Assertions.assertEquals(2, numberOfUnconsumedValues()) }
             }
         }
 
@@ -83,13 +82,14 @@ internal class PlaygroundTest {
 
             testFlow.testScenario(take = 3, confirmSteps = false) {
 
-                doAt(0) { nextValueEquals { 0 } }
-                doAt(1) { nextValueEquals { 1 } }
-                doAt(2) { nextValueEquals { 2 } }
-                then { nextValueEquals { -1 } }
-                then { nextValueEquals { -1 } }
+                doAt(0) { Assertions.assertEquals(0, pollValue) }
+                doAt(1) { Assertions.assertEquals(1, pollValue) }
+                doAt(2) { Assertions.assertEquals(2, pollValue) }
 
-                afterAll { remainingValuesCount { 0 } }
+                then { Assertions.fail() }
+                then { Assertions.fail() }
+
+                afterAll { Assertions.assertEquals(0, numberOfUnconsumedValues()) }
             }
         }
 
@@ -101,12 +101,12 @@ internal class PlaygroundTest {
                 take = 7
                 timeOut = FlowScenarioApi.MAX_TIMEOUT
 
-
                 doAt(0, 1, 2, 3) { dismissValue() }
-                then { nextValueEquals { 4 } }
-                then { nextValueEquals { 5 } }
+                doAt(4) { Assertions.assertEquals(4, pollValue) }
+                doAt(5) { Assertions.assertEquals(5, pollValue) }
 
-                afterAll { remainingValuesCount { 1 } }
+
+                afterAll { Assertions.assertEquals(1, numberOfUnconsumedValues()) }
             }
         }
 
@@ -121,7 +121,7 @@ internal class PlaygroundTest {
                     doAt(0, 0, 0) { dismissValue() }
                 }
 
-                afterAll { remainingValuesCount { 4 } }
+                afterAll { Assertions.assertEquals(4, numberOfUnconsumedValues()) }
             }
         }
 
@@ -129,13 +129,9 @@ internal class PlaygroundTest {
         fun `testScenario 7`() = runBlockingTest {
             val testFlow = getConstantTimeFlow()
 
-            Assertions.assertThrows(AssertionFailedError::class.java) {
-                runBlockingTest {
-                    testFlow.testScenario {
+            testFlow.testScenario {
 
-                        afterAll { consumedEnough() }
-                    }
-                }
+                afterAll { Assertions.assertFalse(consumedAllSteps()) }
             }
         }
 
@@ -147,6 +143,7 @@ internal class PlaygroundTest {
 
             testFlow.testScenario {
                 take = 7
+                forceConsumeAllSteps = false
 
                 beforeAll { }
 
@@ -155,19 +152,48 @@ internal class PlaygroundTest {
                     stateFlow.emit(++currentPostion)
                 }
                 then {
-                    nextValueEquals { 4 }
+                    doAt(4) { Assertions.assertEquals(4, pollValue) }
                     stateFlow.emit(++currentPostion)
                 }
                 then {
-                    nextValueEquals { 5 }
+                    doAt(5) { Assertions.assertEquals(5, pollValue) }
                     stateFlow.emit(++currentPostion)
                     stateFlow.emit(++currentPostion)
                 }
 
                 afterAll {
-                    remainingValuesCount { 1 }
-                    consumedEnough()
+                    afterAll { Assertions.assertEquals(1, numberOfUnconsumedValues()) }
                 }
+            }
+        }
+
+        @Test
+        fun `testScenario 9`() = runBlockingTest {
+            val testFlow = flowOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+            testFlow testScenario {
+                take = 4
+
+                doAt(0) { Assertions.assertEquals(0, pollValue) }
+                doAt(1) { Assertions.assertEquals(1, pollValue) }
+                then { Assertions.assertEquals(2, pollValue) }
+                then { Assertions.assertEquals(3, pollValue) }
+
+                afterAll { Assertions.assertEquals(0, numberOfUnconsumedValues()) }
+            }
+        }
+
+        @Test
+        fun `testScenario 10`() = runBlockingTest {
+            val testFlow = getConstantTimeFlow()
+
+            testFlow.testScenario {
+                forceConsumeAllSteps = false
+                timeOut = 500L
+
+                doAt(0, 1, 2, 3) { dismissValue() }
+
+                afterAll { Assertions.assertTrue(finishWithTimeout()) }
             }
         }
     }
@@ -189,11 +215,11 @@ internal class PlaygroundTest {
             val testFlow = getConstantTimeFlow()
 
             testFlow.testCollect(take = 5) {
-                nextValueEquals(0)
-                nextValueEquals(1)
+                Assertions.assertEquals(0, pollValue)
+                Assertions.assertEquals(1, pollValue)
                 dismissValue()
-                nextValueEquals(3)
-                nextValueEquals(4)
+                Assertions.assertEquals(3, pollValue)
+                Assertions.assertEquals(4, pollValue)
             }
         }
 
@@ -202,10 +228,11 @@ internal class PlaygroundTest {
             val testFlow = getConstantTimeFlow()
 
             testFlow.testCollect(take = 5) {
-                nextValueEquals(0)
-                nextValueEquals { 1 }
-                nextValueEquals { 2 }
-                nextValueEquals { 3 }
+                Assertions.assertEquals(0, pollValue)
+                Assertions.assertEquals(1, pollValue)
+                Assertions.assertEquals(2, pollValue)
+                Assertions.assertEquals(3, pollValue)
+                Assertions.assertEquals(4, pollValue)
             }
         }
     }
