@@ -1,5 +1,4 @@
 import flowTester.scenario.FlowScenario
-import flowTester.scenario.FlowScenarioApi
 import flowTester.scenario.testCollect
 import flowTester.scenario.testScenario
 import kotlinx.coroutines.delay
@@ -129,7 +128,7 @@ internal class PlaygroundTest {
             testFlow.testScenario {
                 allowUncaughtThrowable = true
 
-                afterAll { Assertions.assertFalse(consumedAllSteps()) }
+                afterAll { Assertions.assertFalse(usedAllSteps()) }
             }
         }
 

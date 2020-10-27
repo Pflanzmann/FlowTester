@@ -4,27 +4,11 @@ import flowTester.scenario.FlowScenarioApi.Companion.MAX_TIMEOUT
 import flowTester.scenario.FlowScenarioApi.Companion.TAKE_WITHOUT_LIMIT
 import flowTester.step.Step
 import flowTester.step.StepApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectIndexed
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.withTimeoutOrNull
-
-interface FlowScenarioApi<T> {
-    companion object {
-        const val MAX_TIMEOUT = Long.MAX_VALUE
-        const val TAKE_WITHOUT_LIMIT = Int.MAX_VALUE
-    }
-
-    var timeOut: Long
-    var verifyAllSteps: Boolean
-    var verifyAllValues: Boolean
-    var allowUncaughtThrowable: Boolean
-    var take: Int
-
-    fun doAt(position: Int, step: suspend StepApi<T>.() -> Unit)
-    fun doAt(vararg positions: Int, step: suspend StepApi<T>.() -> Unit)
-    fun beforeAll(step: suspend StepApi<T>.() -> Unit)
-    fun afterAll(step: suspend StepApi<T>.() -> Unit)
-    fun then(step: suspend StepApi<T>.() -> Unit)
-}
 
 internal class FlowScenario<T>(private val flow: Flow<T>) : FlowScenarioApi<T> {
     class StepDoubleAssignmentException : Throwable()
