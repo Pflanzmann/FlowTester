@@ -1,8 +1,8 @@
 # FlowTester
 
-A Kotlin DSL to help testing flows.
+A Kotlin DSL to help test flows.
 
-This is a example of a scenario to test a flow
+This is an example of a scenario to test a flow.
 ```kotlin
 @Test
 fun flowTest() = runBlocking {
@@ -11,44 +11,44 @@ fun flowTest() = runBlocking {
     testFlow testScenario {
         take = 4
 
-        doAt(position = 0) { nextValueEquals(0) }
-        doAt(position = 1) { nextValueEquals(1) }
-        then { nextValueEquals(2) }
-        then { nextValueEquals(3) }
-
-        afterAll { remainingValuesCount { 0 } }
+        doAt(0) { Assertions.assertEquals(0, pollValue) }
+        doAt(1) { Assertions.assertEquals(1, pollValue) }
+        then { Assertions.assertEquals(2, pollValue) }
+        then { Assertions.assertEquals(3, pollValue) }
+    
+        afterAll { Assertions.assertEquals(0, numberOfUnconsumedValues()) }
     }
 }
 ```
 
 ## Using in your projects
 
-The libraries are published to [FlowTester](https://bintray.com/beta/#/pflanzmann/flow-tester/FlowTester) bintray repository,
+The libraries are published to [FlowTester](https://bintray.com/beta/#/pflanzmann/flow-tester/FlowTester) bintray repository and
 linked to [JCenter](https://bintray.com/bintray/jcenter?filterByPkgName=kotlinx.coroutines).
 
 ### Maven
 
-Add dependencies (you can also add other modules that you need):
+Add dependencies:
 
 ```xml
 <dependency>
     <groupId>org.pflanzmann</groupId>
     <artifactId>flow-tester</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
 ### Gradle
 
-Add dependencies (you can also add other modules that you need):
+Add dependencies:
 
 ```groovy
 dependencies {
-    implementation 'org.pflanzmann:flow-tester:0.1.0'
+    implementation 'org.pflanzmann:flow-tester:0.2.0'
 }
 ```
 
-Make sure that you have either `jcenter()` in the list of repositories:
+Make sure that you have `jcenter()` in the list of repositories:
 ```
 repository {
     jcenter()
