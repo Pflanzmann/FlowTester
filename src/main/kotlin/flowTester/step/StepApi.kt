@@ -1,7 +1,5 @@
 package flowTester.step
 
-import kotlin.reflect.KClass
-
 /**
  * A Step defines a method and the scope that is invoked when the flow emits a new value
  */
@@ -18,6 +16,11 @@ interface StepApi<T> {
     val popValue: T
 
     /**
+     * Returns index of the current step
+     */
+    val currentPosition: Int
+
+    /**
      * Polls a number of values and dismisses them
      * @param number: The number of values that should get dismissed
      */
@@ -26,7 +29,7 @@ interface StepApi<T> {
     /**
      * Returns whether all values got consumed or not
      */
-    fun allValuesConsumed(): Boolean
+    fun consumedAllValues(): Boolean
 
     /**
      * Returns the number of unconsumed values
@@ -37,24 +40,4 @@ interface StepApi<T> {
      * Returns whether the flow ended with a timeout or not
      */
     fun finishWithTimeout(): Boolean
-
-    /**
-     * Returns whether the all steps got used or not
-     */
-    fun usedAllSteps(): Boolean
-
-    /**
-     * Verify if the flow did throw an exception of the given type
-     */
-    fun <E : Throwable> didThrow(type: KClass<E>): Boolean
-
-    /**
-     * Verify if the flow did throw an exception of the given type
-     */
-    fun <E : Throwable> didThrow(type: () -> KClass<E>): Boolean
-
-    /**
-     * Verify if the flow did throw an exception that equals the given exception
-     */
-    fun didThrow(expectedThrowable: Throwable): Boolean
 }

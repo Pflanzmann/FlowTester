@@ -1,47 +1,52 @@
 package flowTester.step
 
-import flowTester.scenario.FlowScenarioApi
 import flowTester.scenario.FlowScenarioApiInternal
-import kotlin.reflect.KClass
 
-internal open class Step<T>(
-    private val flowScenario: FlowScenarioApiInternal<T>,
-    private val block: suspend StepApi<T>.() -> Unit
-) : StepApiInternal<T> {
+internal sealed class Step<T>(private val flowScenario: FlowScenarioApiInternal<T>) : StepApiInternal<T> {
+//    abstract val flowScenario: FlowScenarioApiInternal<T>
+
+    override var invoked: Boolean = false
 
     override val pollValue: T
-        get() = flowScenario.pollValue
+        get() = this.flowScenario.pollValue
 
     override val popValue: T
-        get() = flowScenario.popValue
+        get() = this.flowScenario.popValue
 
-    override suspend operator fun invoke() = block()
+    override val currentPosition: Int
+        get() = this.flowScenario.indexCurrentStep
 
-    override fun allValuesConsumed(): Boolean = flowScenario.valueCount == 0
+    override fun consumedAllValues(): Boolean = this.flowScenario.valueCount == 0
 
-    override fun numberOfUnconsumedValues(): Int = flowScenario.valueCount
+    override fun numberOfUnconsumedValues(): Int = this.flowScenario.valueCount
 
-    override fun finishWithTimeout(): Boolean = flowScenario.finishedWithTimeout
+    override fun finishWithTimeout(): Boolean = this.flowScenario.finishedWithTimeout
 
     override fun dismissValue(number: Int) = repeat(number) {
-        flowScenario.pollValue
+        this.flowScenario.pollValue
     }
 
-    override fun usedAllSteps(): Boolean {
-        return (flowScenario.take != FlowScenarioApi.TAKE_WITHOUT_LIMIT && flowScenario.take != flowScenario.numberOfConsumedSteps)
+    internal class NoArgStep<T>(fS: FlowScenarioApiInternal<T>, private val block: suspend StepApi<T>.() -> Unit) : Step<T>(fS) {
+
+        suspend operator fun invoke() {
+            block()
+            invoked = true
+        }
     }
 
-    override fun <E : Throwable> didThrow(type: KClass<E>): Boolean {
-        val throwable = flowScenario.consumeThrowable()
+    class ValueStep<T>(fS: FlowScenarioApiInternal<T>, private val block: suspend StepApi<T>.(T) -> Unit) : Step<T>(fS) {
 
-        return !type.isInstance(throwable)
+        suspend operator fun invoke(value: T) {
+            block(value)
+            invoked = true
+        }
     }
 
-    override fun <E : Throwable> didThrow(type: () -> KClass<E>): Boolean = didThrow(type())
+    class CatchStep<T>(fS: FlowScenarioApiInternal<T>, private val block: (suspend StepApi<T>.(Throwable) -> Unit)? = null) : Step<T>(fS) {
 
-    override fun didThrow(expectedThrowable: Throwable): Boolean {
-        val throwable = flowScenario.consumeThrowable()
-
-        return expectedThrowable == throwable
+        suspend operator fun invoke(throwable: Throwable) {
+            block?.invoke(this, throwable)
+            invoked = true
+        }
     }
 }

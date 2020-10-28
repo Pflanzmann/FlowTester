@@ -54,3 +54,60 @@ repository {
     jcenter()
 }
 ```
+
+### Introduction
+This Kotlin DSL was made to test flows which emit the values of `BroadcastReceiverChannels`. Here the problem was that you could just test value the 
+flow emitted at a fix time, but if you wanted to make sure that the flow did not emit something between your checks or maybe some value twice 
+you had to cache all values asynchronously or do a clunky `when` statement to handle different emits.
+
+FlowScenarios allows you to test every kind of flow synchronous with a Kotlin DSL and react for each emitted value on its own, without knowing
+before what you expect. 
+
+A `FlowScenario` collects on a flow and caches all values. You can then consume those values via polling or popping them at any given time
+inside of this Scenario. You´re also able to call different useful methods as the count of unconsumed values, the count of invoked steps or 
+if the flow finished with an `Exception`. The style of this library is heavily inspired by other Kotlin libraries and JUnit so that the use 
+should be more instinctive. 
+
+### More Examples
+
+```
+@Test
+fun `testScenario 08`() = runBlockingTest {
+   val testFlow = MutableStateFlow("")
+
+   testFlow.testScenario {
+
+       beforeAll {
+           testFlow.emit("SETUP")
+       }
+
+       doAt(0) { value ->
+           Assertions.assertEquals("SETUP", value)
+           testFlow.emit("IDLE")
+       }
+
+       then {value ->
+           Assertions.assertEquals("IDLE", value)
+           testFlow.emit("REQUEST INFORMATION")
+       }
+
+       then {value ->
+           Assertions.assertEquals("REQUEST INFORMATION", value)
+           testFlow.emit("FETCHED INFORMATIONS")
+       }
+
+       doAt(3) {value ->
+           Assertions.assertEquals("FETCHED INFORMATIONS", value)
+           testFlow.emit("PROCESS INFORMATIONS")
+       }
+
+       then {value ->
+           Assertions.assertEquals("PROCESS INFORMATIONS", value)
+       }
+
+       afterAll {
+           afterAll { Assertions.assertEquals(1, numberOfUnconsumedValues()) }
+       }
+   }
+}
+```

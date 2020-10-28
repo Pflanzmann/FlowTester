@@ -23,12 +23,7 @@ internal interface FlowScenarioApiInternal<T> : FlowScenarioApi<T> {
     var finishedWithTimeout: Boolean
 
     /**
-     * Returns the number of consumed Steps
+     * Returns index of the current step
      */
-    var numberOfConsumedSteps: Int
-
-    /**
-     * Consumes t
-     */
-    fun consumeThrowable(): Throwable?
+    var indexCurrentStep: Int
 }
