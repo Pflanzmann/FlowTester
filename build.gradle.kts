@@ -1,6 +1,6 @@
 import org.apache.tools.ant.types.resources.selectors.Date
 
-val ownVersion: String = "0.1.0"
+val ownVersion: String = "0.2.0"
 
 plugins {
     kotlin("jvm") version ("1.4.10")
